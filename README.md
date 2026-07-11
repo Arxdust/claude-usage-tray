@@ -42,6 +42,8 @@ that you have logged into through Claude Code.
   centre of the icon and stays readable even at 16–32 px.
 - **Graphical dashboard** — a dark-themed window with a glowing circular gauge,
   selectable quota cards, reset countdowns, and a refresh button.
+- **Floating widget** — an optional light-theme, semi-transparent panel that pins
+  on top of your screen and shows your session and weekly usage bars at all times.
 - **Threshold alerts** — an on-screen popup and a tray notification appear the
   moment your remaining quota crosses below 50% and below 20%.
 - **Runs quietly** — polls every 3 minutes (safe against rate limits), sits in the
@@ -65,6 +67,20 @@ The icon is coloured by how much quota you have **left** (not how much you have 
 When more than one quota is active (for example the 5-hour window and the weekly
 cap), the icon always reflects **whichever one is lowest**, so you are never caught
 out by the limit you were not watching. All thresholds are configurable.
+
+---
+
+## Floating widget
+
+![Floating widget](docs/widget.png)
+
+A light-theme alternative to the dashboard. Open it from the tray menu
+(**Floating widget**). It is semi-transparent, stays pinned on top of other
+windows, and shows a horizontal usage bar for your current session and your weekly
+limit, plus your plan badge and reset times. Drag it anywhere; click the pin to
+toggle always-on-top; press the refresh button to update immediately. Adjust its
+transparency with `widget_opacity`, or have it open on startup with
+`widget_on_start`. It uses the Sarabun and Inter typefaces and Material Symbols.
 
 ---
 
@@ -165,7 +181,9 @@ Drag anywhere on the window to move it; press **Esc** or the back arrow to close
 |------|--------------|
 | Refresh now | Fetch the latest usage immediately |
 | Details | Open the dashboard |
+| Floating widget | Open the pinnable, semi-transparent light-theme widget |
 | Connect Claude account | Open the login / onboarding window |
+| About | App info and a link to the project on GitHub |
 | Start with Windows | Toggle automatic startup |
 | Notification (balloon) | Toggle the tray notification on threshold crossings |
 | Popup alert below 50% / 20% | Toggle the on-screen warning window |
@@ -193,6 +211,8 @@ run). Edit it with any text editor, then restart the app.
 | `blink_when_red` | `true` | Blink the icon while in the red state. |
 | `show_percent_text` | `true` | Draw the remaining percentage on the icon. |
 | `watch` | `["five_hour", "seven_day"]` | Which quotas drive the icon colour (the lowest wins). |
+| `widget_opacity` | `0.94` | Transparency of the floating widget (0.5–1.0). |
+| `widget_on_start` | `false` | Open the floating widget automatically on startup. |
 
 ---
 
@@ -247,7 +267,8 @@ claude-usage-tray/
     status.py      Turn the response into a status + colour
     icon.py        Draw the coloured tray icon
     dashboard.py   Render the graphical dashboard (Pillow)
-    ui.py          tkinter windows: dashboard, alert, onboarding
+    widget.py      Render the floating light-theme widget (Pillow)
+    ui.py          tkinter windows: dashboard, widget, alert, onboarding, about
     tray.py        Tray loop, menu, polling, alerts
     config.py      Load and save settings
     autostart.py   Start-with-Windows toggle
@@ -299,6 +320,10 @@ account you are already signed into.
 Inspired by [jens-duttke/usage-monitor-for-claude](https://github.com/jens-duttke/usage-monitor-for-claude)
 and the wider Claude Code usage-tooling community
 ([ccusage](https://ccusage.com), Claude-Code-Usage-Monitor, and others).
+
+Fonts and icons: [Sarabun](https://fonts.google.com/specimen/Sarabun) and
+[Inter](https://fonts.google.com/specimen/Inter) (SIL Open Font License), and
+[Material Symbols](https://github.com/google/material-design-icons) (Apache 2.0).
 
 ## License
 

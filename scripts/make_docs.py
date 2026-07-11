@@ -190,8 +190,23 @@ def make_flow():
     img.convert("RGB").save(os.path.join(DOCS, "how-it-works.png"))
 
 
+# ---------- WIDGET (ธีมสว่าง) ----------
+def make_widget():
+    from claude_usage_tray import widget as wg
+    q = [Quota("five_hour", "5 ชั่วโมง", 12, 88, "2026-07-11T20:48:00+00:00"),
+         Quota("seven_day", "รายสัปดาห์", 10, 90, "2026-07-13T12:59:00+00:00")]
+    card, _ = wg.render(Status("green", 88, "five_hour", q), CFG, "Max (20×)", "23:31")
+    W2, H2 = 460, 320
+    bg = vgrad(W2, H2, (232, 236, 244), (214, 221, 234))  # ฉากสว่างนวล
+    x = (W2 - card.width) // 2
+    y = (H2 - card.height) // 2
+    bg.alpha_composite(card, (x, y))
+    bg.convert("RGB").save(os.path.join(DOCS, "widget.png"))
+
+
 if __name__ == "__main__":
     make_hero()
     make_states()
     make_flow()
+    make_widget()
     print("wrote:", os.listdir(DOCS))

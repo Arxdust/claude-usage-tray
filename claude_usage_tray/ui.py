@@ -13,7 +13,9 @@ import tkinter as tk
 import webbrowser
 from typing import Any, Callable
 
-from . import __version__, config as config_mod, dashboard, icon as icon_mod
+import time
+
+from . import __version__, api, config as config_mod, dashboard, icon as icon_mod, widget as widget_mod
 from .status import COLORS, GREEN, ORANGE, RED, Status, humanize_reset
 
 GITHUB_URL = "https://github.com/ksmaster03/claude-usage-tray"
@@ -396,6 +398,89 @@ def _onboard_window(recheck, open_login, has_cli) -> None:
         root.mainloop()
     finally:
         _done("onboard")
+
+
+# ---------- widget ลอยหน้าจอ (ธีมสว่าง โปร่งใส ปักหมุด) ----------
+def show_widget(get_status: Callable[[], Status], cfg: dict, on_refresh: Callable[[], None]) -> None:
+    if not _once("widget"):
+        return
+    threading.Thread(target=_widget_window, args=(get_status, cfg, on_refresh), daemon=True).start()
+
+
+def _widget_window(get_status, cfg, on_refresh) -> None:
+    try:
+        root = tk.Tk()
+        root.overrideredirect(True)
+        try:
+            root.attributes("-alpha", float(cfg.get("widget_opacity", 0.94)))
+        except Exception:  # noqa: BLE001
+            pass
+        # วางมุมขวาล่างเหนือถาดระบบ
+        root.update_idletasks()
+        x = root.winfo_screenwidth() - widget_mod.W - 24
+        y = root.winfo_screenheight() - widget_mod.H - 64
+        root.geometry(f"{widget_mod.W}x{widget_mod.H}+{x}+{y}")
+        # ย้ำตำแหน่งอีกครั้งหลัง map (overrideredirect บางทีไม่รับ +x+y ทันที)
+        root.after(40, lambda: root.geometry(f"+{x}+{y}"))
+
+        widget_mod._cache["_pinned"] = True
+        root.attributes("-topmost", True)
+        st = {"photo": None, "regions": {}, "press": None}
+        lbl = tk.Label(root, bd=0, bg="#fafafc")
+        lbl.pack()
+
+        def redraw():
+            s = get_status()
+            plan = api.read_plan()
+            pil, regions = widget_mod.render(s, cfg, plan, time.strftime("%H:%M"))
+            st["photo"] = _pil_photo(pil)
+            st["regions"] = regions
+            lbl.config(image=st["photo"])
+
+        def hit(x, y):
+            r = st["regions"]
+            if _in_rect(x, y, r.get("close", (0, 0, 0, 0))):
+                root.destroy(); return
+            if _in_rect(x, y, r.get("refresh", (0, 0, 0, 0))):
+                on_refresh(); root.after(1500, redraw); return
+            if _in_rect(x, y, r.get("pin", (0, 0, 0, 0))):
+                pinned = not widget_mod._cache.get("_pinned", True)
+                widget_mod._cache["_pinned"] = pinned
+                root.attributes("-topmost", pinned)
+                redraw(); return
+
+        def on_press(e):
+            st["press"] = (e.x_root, e.y_root, root.winfo_x(), root.winfo_y())
+
+        def on_drag(e):
+            if not st["press"]:
+                return
+            px, py, wx, wy = st["press"]
+            root.geometry(f"+{wx + e.x_root - px}+{wy + e.y_root - py}")
+
+        def on_release(e):
+            if not st["press"]:
+                return
+            px, py, _, _ = st["press"]
+            if abs(e.x_root - px) < 5 and abs(e.y_root - py) < 5:
+                hit(e.x, e.y)
+
+        def tick():
+            if not root.winfo_exists():
+                return
+            redraw()
+            root.after(3000, tick)
+
+        lbl.bind("<Button-1>", on_press)
+        lbl.bind("<B1-Motion>", on_drag)
+        lbl.bind("<ButtonRelease-1>", on_release)
+        root.bind("<Escape>", lambda _e: root.destroy())
+
+        redraw()
+        root.after(3000, tick)
+        root.mainloop()
+    finally:
+        _done("widget")
 
 
 # ---------- หน้าเกี่ยวกับ (About) ----------

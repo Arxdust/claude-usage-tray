@@ -38,6 +38,7 @@ class TrayApp:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("รีเฟรชเดี๋ยวนี้", self._on_refresh),
             pystray.MenuItem("ดูรายละเอียด…", self._on_details, default=True),
+            pystray.MenuItem("วิดเจ็ตลอยหน้าจอ", self._on_widget),
             pystray.MenuItem("เชื่อมต่อบัญชี Claude…", self._on_connect),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
@@ -102,6 +103,9 @@ class TrayApp:
 
     def _on_about(self, *_):
         ui.show_about(lambda: self.status, self.cfg)
+
+    def _on_widget(self, *_):
+        ui.show_widget(lambda: self.status, self.cfg, self._on_refresh)
 
     @staticmethod
     def _has_cli() -> bool:
@@ -220,6 +224,8 @@ class TrayApp:
         # ครั้งแรกยังไม่ login -> เปิดหน้า onboarding ช่วยเชื่อมต่อบัญชี
         if not read_access_token():
             ui.show_onboarding(self._recheck_token, self._open_login, self._has_cli)
+        elif self.cfg.get("widget_on_start"):
+            ui.show_widget(lambda: self.status, self.cfg, self._on_refresh)
         threading.Thread(target=self._poll_loop, daemon=True).start()
         threading.Thread(target=self._blink_loop, daemon=True).start()
         self.icon.run()

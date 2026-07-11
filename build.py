@@ -24,6 +24,9 @@ ARGS = [
 ]
 if os.path.exists(ICON):
     ARGS += ["--icon", ICON]
+FONTS = os.path.join(HERE, "assets", "fonts")
+if os.path.isdir(FONTS):
+    ARGS += ["--add-data", f"{FONTS}{os.pathsep}assets/fonts"]  # bundle ฟอนต์ widget
 ARGS.append(os.path.join(HERE, "app.py"))
 
 if __name__ == "__main__":

@@ -44,6 +44,23 @@ def read_access_token() -> str | None:
         return None
 
 
+def read_plan() -> str | None:
+    """อ่านชื่อแพ็กเกจสำหรับ badge (เช่น 'Max (20×)' / 'Pro') จาก credential."""
+    if not CLAUDE_CREDENTIALS.exists():
+        return None
+    try:
+        o = json.loads(CLAUDE_CREDENTIALS.read_text(encoding="utf-8")).get("claudeAiOauth", {})
+    except (OSError, ValueError):
+        return None
+    sub = o.get("subscriptionType")
+    tier = o.get("rateLimitTier") or ""
+    name = sub.capitalize() if isinstance(sub, str) and sub else None
+    m = re.search(r"(\d+)\s*x", str(tier), re.I)
+    if name and m:
+        return f"{name} ({m.group(1)}×)"
+    return name
+
+
 def _user_agent() -> str:
     global _cached_ua
     if _cached_ua:

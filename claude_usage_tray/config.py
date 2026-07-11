@@ -33,6 +33,9 @@ DEFAULTS: dict[str, Any] = {
     # นับ quota ไหนบ้างในการเลือกสี (ใช้ค่าที่แย่ที่สุด = เหลือน้อยสุด)
     #   five_hour = หน้าต่าง 5 ชม., seven_day = เพดานรายสัปดาห์
     "watch": ["five_hour", "seven_day"],
+    # widget ลอยหน้าจอ (ธีมสว่าง)
+    "widget_opacity": 0.94,     # ความโปร่งใส 0.5–1.0
+    "widget_on_start": False,   # เปิด widget อัตโนมัติเมื่อเริ่มโปรแกรม
 }
 
 
