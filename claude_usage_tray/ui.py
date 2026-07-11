@@ -10,10 +10,13 @@ import io
 import os
 import threading
 import tkinter as tk
+import webbrowser
 from typing import Any, Callable
 
-from . import config as config_mod, dashboard, icon as icon_mod
+from . import __version__, config as config_mod, dashboard, icon as icon_mod
 from .status import COLORS, GREEN, ORANGE, RED, Status, humanize_reset
+
+GITHUB_URL = "https://github.com/ksmaster03/claude-usage-tray"
 
 # โทนสี (ธีมเข้ม)
 BG = "#0b1220"
@@ -393,3 +396,65 @@ def _onboard_window(recheck, open_login, has_cli) -> None:
         root.mainloop()
     finally:
         _done("onboard")
+
+
+# ---------- หน้าเกี่ยวกับ (About) ----------
+def show_about(get_status: Callable[[], Status], cfg: dict) -> None:
+    if not _once("about"):
+        return
+    threading.Thread(target=_about_window, args=(get_status, cfg), daemon=True).start()
+
+
+def _about_window(get_status, cfg) -> None:
+    root = tk.Tk()
+    root.title("เกี่ยวกับ Claude Usage Tray")
+    root.configure(bg=BG)
+    root.resizable(False, False)
+    W, H = 420, 430
+    _center(root, W, H)
+
+    tk.Frame(root, bg=_hex(COLORS[GREEN]), height=6).pack(fill="x")
+    wrap = tk.Frame(root, bg=BG)
+    wrap.pack(fill="both", expand=True, padx=26, pady=18)
+
+    try:
+        img = _photo(icon_mod.render(get_status(), cfg), 76)
+        l = tk.Label(wrap, image=img, bg=BG)
+        l.image = img
+        l.pack(pady=(2, 8))
+    except Exception:  # noqa: BLE001
+        pass
+
+    tk.Label(wrap, text="Claude Usage Tray", bg=BG, fg=TXT,
+             font=(FONT, 17, "bold")).pack()
+    tk.Label(wrap, text=f"เวอร์ชัน {__version__}", bg=BG, fg=SUB,
+             font=(FONT, 10)).pack(pady=(0, 10))
+
+    desc = (
+        "โปรแกรมเล็ก ๆ บนถาดระบบ Windows ที่คอยดูโควต้า token\n"
+        "ของ Claude Code แบบเรียลไทม์ ไอคอนเปลี่ยนสีตามที่เหลือ\n"
+        "(เขียว > ส้ม > แดง) และคลิกเปิดหน้า Dashboard ดูรายละเอียดได้\n\n"
+        "อ่าน credential ในเครื่องแบบอ่านอย่างเดียว เพื่อแสดงการใช้งาน\n"
+        "ของคุณเอง ไม่เก็บ ไม่ส่ง token ไปที่ไหน"
+    )
+    tk.Label(wrap, text=desc, bg=BG, fg=TXT, font=(FONT, 10),
+             justify="center").pack(pady=(0, 14))
+
+    link = tk.Label(wrap, text=GITHUB_URL, bg=BG, fg=_hex(COLORS[GREEN]),
+                    font=(FONT, 10, "underline"), cursor="hand2")
+    link.pack()
+    link.bind("<Button-1>", lambda _e: webbrowser.open(GITHUB_URL))
+
+    tk.Label(wrap, text="ฟรีและโอเพนซอร์ส · สัญญาอนุญาต MIT", bg=BG, fg=SUB,
+             font=(FONT, 9)).pack(pady=(6, 12))
+
+    tk.Button(wrap, text="ปิด", command=root.destroy, bg=CARD2, fg=TXT,
+              activebackground=TRACK, activeforeground=TXT, relief="flat",
+              font=(FONT, 10, "bold"), padx=26, pady=6, cursor="hand2").pack()
+
+    root.attributes("-topmost", True)
+    root.after(400, lambda: root.attributes("-topmost", False))
+    try:
+        root.mainloop()
+    finally:
+        _done("about")

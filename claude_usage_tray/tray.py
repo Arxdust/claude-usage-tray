@@ -56,6 +56,7 @@ class TrayApp:
                 checked=lambda _: self.cfg.get("popup_alert", True),
             ),
             pystray.Menu.SEPARATOR,
+            pystray.MenuItem("เกี่ยวกับ", self._on_about),
             pystray.MenuItem("ออก", self._on_quit),
         )
 
@@ -98,6 +99,9 @@ class TrayApp:
 
     def _on_connect(self, *_):
         ui.show_onboarding(self._recheck_token, self._open_login, self._has_cli)
+
+    def _on_about(self, *_):
+        ui.show_about(lambda: self.status, self.cfg)
 
     @staticmethod
     def _has_cli() -> bool:
