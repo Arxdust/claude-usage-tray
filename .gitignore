@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# PyInstaller build output
+build/
+dist/
+dist_installer/
+*.spec
+
+# Secrets / credentials (never commit)
+*.env
+.env*
+*.pem
+*.key
+*accessKeys*.csv
+*credentials*.json
+.claude-usage-tray.json
+
+# OS / editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
