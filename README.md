@@ -1,5 +1,7 @@
 # Claude Usage Tray
 
+**English** | [ไทย](README.th.md)
+
 ![Claude Usage Tray](docs/hero.png)
 
 A lightweight Windows system-tray application that monitors your **Claude Code**
