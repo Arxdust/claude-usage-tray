@@ -35,6 +35,9 @@ MI = {"refresh": 0xE5D5, "close": 0xE5CD, "pin": 0xF10D, "monitor": 0xEF5B,
 
 _cache: dict[str, Any] = {}
 
+# window color key: the OS makes pixels of exactly this color fully transparent
+KEY = (255, 0, 255)
+
 
 def _fpath(name: str) -> str:
     base = getattr(sys, "_MEIPASS", None)
@@ -102,6 +105,31 @@ def _pill(d, box, r, fill):
     d.rounded_rectangle(box, radius=r, fill=fill)
 
 
+def color_keyed(img: Image.Image) -> Image.Image:
+    """Flatten an RGBA render for a color-keyed window, which has no per-pixel alpha:
+    the corners and soft shadow become KEY, the card is made opaque (its anti-aliased
+    edge blended onto the card color)."""
+    opaque = img.getchannel("A").point(lambda a: 255 if a >= 128 else 0)
+    card = Image.new("RGBA", img.size, BG + (255,))
+    card.alpha_composite(img)
+    out = Image.new("RGB", img.size, KEY)
+    out.paste(card.convert("RGB"), mask=opaque)
+    return out
+
+
+def _wrap(d, text, font, width) -> list[str]:
+    """Greedy word wrap to the given pixel width."""
+    lines, cur = [], ""
+    for word in text.split():
+        trial = f"{cur} {word}".strip()
+        if cur and d.textlength(trial, font=font) > width:
+            lines.append(cur)
+            cur = word
+        else:
+            cur = trial
+    return lines + [cur] if cur else lines
+
+
 def render(status: Status, cfg: dict, plan: str | None, updated: str) -> tuple[Image.Image, dict]:
     S = SS
     img = Image.new("RGBA", (W * S, H * S), (0, 0, 0, 0))
@@ -160,8 +188,11 @@ def render(status: Status, cfg: dict, plan: str | None, updated: str) -> tuple[I
 
     # ----- footer -----
     fy = H - 32
+    # divider = BORDER at alpha 120 over the card, pre-blended and drawn opaque:
+    # a translucent outline would overwrite the card's alpha and leave a see-through line
+    div = tuple(int(b + (c - b) * 120 / 255) for b, c in zip(BG, BORDER))
     d.rounded_rectangle([pad * S, (fy - 8) * S, (W - pad) * S, (fy - 8) * S], 0,
-                        outline=BORDER + (120,), width=int(1 * S))
+                        outline=div + (255,), width=int(1 * S))
     _rt(d, pad * S, fy * S, chr(MI["dot"]), _mi(11 * S), COLORS[GREEN], anchor="lm")
     _rt(d, (pad + 16) * S, fy * S, t("widget.footer", time=updated, n=cfg["poll_seconds"] // 60),
         _text(10.5 * S, "Regular"), SUB, anchor="lm")
@@ -180,6 +211,11 @@ def render(status: Status, cfg: dict, plan: str | None, updated: str) -> tuple[I
     regions["refresh"] = (rf_x, fy - 12, rf_x + rf_w, fy + 12)
 
     if status.error:
-        _rt(d, (W / 2) * S, (H - 4) * S, status.error, _text(10 * S), COLORS[ORANGE], anchor="mm")
+        # in the empty body of the card: outside the card the window is transparent
+        ef = _text(11 * S)
+        lines = _wrap(d, status.error, ef, (W - pad * 2) * S)
+        ey = 112 - (len(lines) - 1) * 8
+        for i, line in enumerate(lines):
+            _rt(d, (W / 2) * S, (ey + i * 16) * S, line, ef, COLORS[ORANGE], anchor="mm")
 
     return img.resize((W, H), Image.LANCZOS), regions

@@ -422,6 +422,14 @@ def _widget_window(get_status, cfg, on_refresh) -> None:
             root.attributes("-alpha", float(cfg.get("widget_opacity", 0.94)))
         except Exception:  # noqa: BLE001
             pass
+        # Tk windows are opaque rectangles: key out everything around the rounded card,
+        # otherwise the corners and the soft shadow show up as a frame
+        key = _hex(widget_mod.KEY)
+        root.configure(bg=key)
+        try:
+            root.attributes("-transparentcolor", key)
+        except tk.TclError:
+            pass  # not supported outside Windows
         # วางมุมขวาล่างเหนือถาดระบบ
         root.update_idletasks()
         x = root.winfo_screenwidth() - widget_mod.W - 24
@@ -433,14 +441,14 @@ def _widget_window(get_status, cfg, on_refresh) -> None:
         widget_mod._cache["_pinned"] = True
         root.attributes("-topmost", True)
         st = {"photo": None, "regions": {}, "press": None}
-        lbl = tk.Label(root, bd=0, bg="#fafafc")
+        lbl = tk.Label(root, bd=0, bg=key)
         lbl.pack()
 
         def redraw():
             s = get_status()
             plan = api.read_plan()
             pil, regions = widget_mod.render(s, cfg, plan, time.strftime("%H:%M"))
-            st["photo"] = _pil_photo(pil)
+            st["photo"] = _pil_photo(widget_mod.color_keyed(pil))
             st["regions"] = regions
             lbl.config(image=st["photo"])
 
