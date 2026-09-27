@@ -10,15 +10,24 @@ from typing import Any
 
 import pystray
 
-from . import autostart, config, icon as icon_mod, ui
+from . import autostart, config, i18n, icon as icon_mod, ui
 from .api import fetch_usage, read_access_token
-from .status import RED, Status, evaluate, humanize_reset
+from .i18n import t
+from .status import RED, UNKNOWN, Status, evaluate, humanize_reset
+
+
+def _tr(key: str):
+    """Menu text that follows the current language (re-read on update_menu)."""
+    return lambda _item: t(key)
 
 
 class TrayApp:
     def __init__(self) -> None:
         self.cfg: dict[str, Any] = config.load()
-        self.status: Status = Status("unknown", None, None, [], error="กำลังโหลด…")
+        self.cfg["language"] = i18n.set_language(self.cfg.get("language"))
+        self.status: Status = Status(UNKNOWN, None, None, [], error=t("status.loading"))
+        self._usage: dict[str, Any] | None = None  # last API response, re-evaluated on language change
+        self._status_lock = threading.Lock()
         self._last_color: str | None = None
         self._stop = threading.Event()
         self._wake = threading.Event()   # ปลุกให้ poll ทันที (Refresh)
@@ -27,7 +36,7 @@ class TrayApp:
         self.icon = pystray.Icon(
             "claude_usage_tray",
             icon=icon_mod.render(self.status, self.cfg),
-            title="Claude Usage — กำลังโหลด…",
+            title=f"Claude Usage — {t('status.loading')}",
             menu=self._build_menu(),
         )
 
@@ -36,29 +45,38 @@ class TrayApp:
         return pystray.Menu(
             pystray.MenuItem(lambda _: self._headline(), None, enabled=False),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("รีเฟรชเดี๋ยวนี้", self._on_refresh),
-            pystray.MenuItem("ดูรายละเอียด…", self._on_details, default=True),
-            pystray.MenuItem("วิดเจ็ตลอยหน้าจอ", self._on_widget),
-            pystray.MenuItem("เชื่อมต่อบัญชี Claude…", self._on_connect),
+            pystray.MenuItem(_tr("menu.refresh"), self._on_refresh),
+            pystray.MenuItem(_tr("menu.details"), self._on_details, default=True),
+            pystray.MenuItem(_tr("menu.widget"), self._on_widget),
+            pystray.MenuItem(_tr("menu.connect"), self._on_connect),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "เริ่มพร้อม Windows",
+                _tr("menu.autostart"),
                 self._on_toggle_autostart,
                 checked=lambda _: autostart.is_enabled(),
             ),
             pystray.MenuItem(
-                "แจ้งเตือน (balloon)",
+                _tr("menu.notify"),
                 self._on_toggle_notify,
                 checked=lambda _: self.cfg.get("notify", True),
             ),
             pystray.MenuItem(
-                "Popup เตือนเมื่อต่ำกว่า 50%/20%",
+                _tr("menu.popup"),
                 self._on_toggle_popup,
                 checked=lambda _: self.cfg.get("popup_alert", True),
             ),
+            pystray.MenuItem(_tr("menu.language"), pystray.Menu(*[
+                pystray.MenuItem(
+                    name,
+                    self._language_action(code),
+                    checked=lambda _, c=code: i18n.get_language() == c,
+                    radio=True,
+                )
+                for code, name in i18n.LANGUAGES.items()
+            ])),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("เกี่ยวกับ", self._on_about),
-            pystray.MenuItem("ออก", self._on_quit),
+            pystray.MenuItem(_tr("menu.about"), self._on_about),
+            pystray.MenuItem(_tr("menu.quit"), self._on_quit),
         )
 
     def _headline(self) -> str:
@@ -66,23 +84,23 @@ class TrayApp:
         if s.error:
             return f"⚠ {s.error}"
         if s.remaining_pct is None:
-            return "ไม่มีข้อมูล"
+            return t("status.no_data")
         dot = {"green": "🟢", "orange": "🟠", "red": "🔴"}.get(s.color, "⚪")
-        return f"{dot} เหลือ {s.remaining_pct:.0f}%"
+        return f"{dot} {t('common.remaining_pct', pct=f'{s.remaining_pct:.0f}')}"
 
     def _details_text(self) -> str:
         s = self.status
         if s.error:
-            return f"สถานะ: {s.error}"
-        lines = ["โควต้าคงเหลือ (Claude Code)\n"]
+            return t("details.status", error=s.error)
+        lines = [t("details.title") + "\n"]
         for q in s.quotas:
-            mark = "  ← กำหนดสี" if q.key == s.driver else ""
-            lines.append(
-                f"• {q.label}: เหลือ {q.remaining_pct:.0f}%  "
-                f"(ใช้ไป {q.used_pct:.0f}%, รีเซ็ต {humanize_reset(q.resets_at)}){mark}"
-            )
-        lines.append("\nเกณฑ์สี: เขียว >50%  |  ส้ม ≤50%  |  แดง ≤20%")
-        lines.append(f"อัปเดตทุก {self.cfg['poll_seconds']} วินาที")
+            mark = t("details.driver") if q.key == s.driver else ""
+            lines.append(t(
+                "details.line", label=q.label, remaining=f"{q.remaining_pct:.0f}",
+                used=f"{q.used_pct:.0f}", reset=humanize_reset(q.resets_at),
+            ) + mark)
+        lines.append("\n" + t("details.legend"))
+        lines.append(t("details.poll", n=self.cfg["poll_seconds"]))
         return "\n".join(lines)
 
     # ---------- callbacks ----------
@@ -142,6 +160,21 @@ class TrayApp:
         self.cfg["popup_alert"] = not self.cfg.get("popup_alert", True)
         config.save(self.cfg)
 
+    def _language_action(self, code: str):
+        return lambda *_: self._set_language(code)
+
+    def _set_language(self, code: str) -> None:
+        self.cfg["language"] = i18n.set_language(code)
+        config.save(self.cfg)
+        # re-translate quota labels/errors from the last response, no extra API call
+        with self._status_lock:
+            if self._usage is not None:
+                self.status = evaluate(self._usage, self.cfg)
+            else:
+                self.status = Status(UNKNOWN, None, None, [], error=t("status.loading"))
+        self._apply_icon()
+        self.icon.update_menu()
+
     def _on_quit(self, *_):
         self._stop.set()
         self._wake.set()
@@ -156,9 +189,11 @@ class TrayApp:
             self._wake.clear()
 
     def _refresh_once(self) -> None:
-        new = evaluate(fetch_usage(), self.cfg)
-        prev = self.status
-        self.status = new
+        usage = fetch_usage()
+        with self._status_lock:
+            self._usage = usage
+            new = evaluate(usage, self.cfg)
+            prev, self.status = self.status, new
         self._apply_icon()
         self._maybe_notify(prev, new)
 
@@ -174,7 +209,7 @@ class TrayApp:
         if s.remaining_pct is None:
             return "Claude Usage"
         parts = [f"{q.label}: {q.remaining_pct:.0f}%" for q in s.quotas[:3]]
-        return "Claude Usage — เหลือ " + "  |  ".join(parts)
+        return "Claude Usage — " + t("tooltip.remaining", parts="  |  ".join(parts))
 
     def _maybe_notify(self, prev: Status, new: Status) -> None:
         order = {"unknown": 0, "green": 0, "orange": 1, "red": 2}
@@ -183,13 +218,14 @@ class TrayApp:
             return
 
         is_red = new.color == RED
-        label = "โควต้าใกล้หมด!" if is_red else "โควต้าเริ่มเหลือน้อย"
+        label = t("alert.red" if is_red else "alert.orange")
+        left = t("common.remaining_pct", pct=f"{new.remaining_pct:.0f}")
         reset = humanize_reset(_driver_reset(new))
 
         # 1) notification balloon
         if self.cfg.get("notify", True):
             try:
-                self.icon.notify(f"{label} เหลือ {new.remaining_pct:.0f}%\nรีเซ็ต {reset}", "Claude Usage")
+                self.icon.notify(f"{label} {left}\n{t('common.resets', reset=reset)}", "Claude Usage")
             except Exception:  # noqa: BLE001
                 pass
 
@@ -201,7 +237,7 @@ class TrayApp:
                 flags = (0x10 if is_red else 0x30) | 0x40000
                 threading.Thread(
                     target=lambda: ctypes.windll.user32.MessageBoxW(
-                        0, f"{label} เหลือ {new.remaining_pct:.0f}%", "Claude Usage", flags),
+                        0, f"{label} {left}", "Claude Usage", flags),
                     daemon=True,
                 ).start()
 

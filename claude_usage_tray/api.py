@@ -104,22 +104,24 @@ def fetch_usage() -> dict[str, Any]:
           ...
         }
     utilization = % ที่ "ใช้ไปแล้ว" (0-100).
+    Error text shown to the user comes from locales (error.<code>); 'message'
+    only carries technical detail for codes without a translation.
     """
     headers = _headers()
     if not headers:
-        return {"error": "no_token", "message": "ไม่พบ token — ล็อกอิน Claude Code ก่อน"}
+        return {"error": "no_token"}
     try:
         resp = requests.get(API_URL_USAGE, headers=headers, timeout=10)
         resp.raise_for_status()
         return resp.json()
     except requests.ConnectionError:
-        return {"error": "connection", "message": "เชื่อมต่อไม่ได้"}
+        return {"error": "connection"}
     except requests.HTTPError as e:
         code = e.response.status_code if e.response is not None else 0
         if code == 401:
-            return {"error": "auth", "message": "token หมดอายุ — เปิด Claude Code ใหม่"}
+            return {"error": "auth"}
         if code == 429:
-            return {"error": "rate_limited", "message": "โดน rate limit (poll ถี่ไป)"}
+            return {"error": "rate_limited"}
         return {"error": "http", "message": f"HTTP {code or '?'}"}
     except Exception as e:  # noqa: BLE001
         return {"error": "unknown", "message": str(e)[:80]}

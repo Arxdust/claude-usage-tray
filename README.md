@@ -48,6 +48,8 @@ that you have logged into through Claude Code.
   moment your remaining quota crosses below 50% and below 20%.
 - **Runs quietly** — polls every 3 minutes (safe against rate limits), sits in the
   tray, and can start automatically with Windows.
+- **Multilingual** — English, Ukrainian, Russian and Thai interface, switchable
+  from the tray menu.
 - **Two ways to ship** — a single portable `.exe`, or a one-click installer.
 
 ---
@@ -187,6 +189,7 @@ Drag anywhere on the window to move it; press **Esc** or the back arrow to close
 | Start with Windows | Toggle automatic startup |
 | Notification (balloon) | Toggle the tray notification on threshold crossings |
 | Popup alert below 50% / 20% | Toggle the on-screen warning window |
+| Language | Switch the interface language (English, Українська, Русский, ไทย) |
 | Quit | Exit the app |
 
 **Alerts** — when your remaining quota first drops to 50% or below, and again at 20%
@@ -213,6 +216,7 @@ run). Edit it with any text editor, then restart the app.
 | `watch` | `["five_hour", "seven_day"]` | Which quotas drive the icon colour (the lowest wins). |
 | `widget_opacity` | `0.94` | Transparency of the floating widget (0.5–1.0). |
 | `widget_on_start` | `false` | Open the floating widget automatically on startup. |
+| `language` | `"th"` | Interface language: `en`, `uk`, `ru` or `th`. Also switchable from the tray menu. |
 
 ---
 
@@ -272,6 +276,8 @@ claude-usage-tray/
     tray.py        Tray loop, menu, polling, alerts
     config.py      Load and save settings
     autostart.py   Start-with-Windows toggle
+    i18n.py        UI translations: t("key") lookup, language switch
+    locales/       Translation files (en / uk / ru / th .json)
   app.py           Entry point used by the build
   build.py         PyInstaller build
   build_all.bat    Build exe + installer

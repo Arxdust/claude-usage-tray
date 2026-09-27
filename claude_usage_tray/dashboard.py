@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
+from .i18n import get_language, t
 from .status import COLORS, GREEN, ORANGE, RED, Status, humanize_reset
 
 # ขนาดหน้าจอแสดงผล (display) และ supersample เพื่อความคม
@@ -30,10 +31,8 @@ ACCENT = (74, 158, 255)  # ฟ้าปุ่ม
 GAUGE_START = 150.0   # องศาเริ่ม (ล่างซ้าย) — PIL: 0=ขวา, เพิ่มตามเข็ม (y ชี้ลง)
 GAUGE_SWEEP = 240.0   # กวาด 240° เปิดช่องล่าง 120°
 
-# ป้ายย่อของแต่ละ quota
+# ป้ายย่อของแต่ละ quota — model names stay as-is; the rest come from locales (tag.<key>)
 TAGS = {
-    "five_hour": "5 ชม.",
-    "seven_day": "รายสัปดาห์",
     "seven_day_opus": "Opus",
     "seven_day_sonnet": "Sonnet",
     "seven_day_cowork": "Cowork",
@@ -42,11 +41,19 @@ TAGS = {
 
 def _font(px: int, weight: str = "regular"):
     # ใช้ Leelawadee UI / Tahoma ที่มี glyph ภาษาไทยครบ (Segoe UI ไม่มี -> เป็นกล่อง)
-    names = {
-        "regular": ("LeelawUI.ttf", "leelawui.ttf", "tahoma.ttf", "arial.ttf"),
-        "semibold": ("LeelaUIb.ttf", "leelauib.ttf", "tahomabd.ttf", "arialbd.ttf"),
-        "bold": ("LeelaUIb.ttf", "leelauib.ttf", "tahomabd.ttf", "arialbd.ttf"),
-    }[weight]
+    # Leelawadee has no Cyrillic, so other languages use Segoe UI
+    if get_language() == "th":
+        names = {
+            "regular": ("LeelawUI.ttf", "leelawui.ttf", "tahoma.ttf", "arial.ttf"),
+            "semibold": ("LeelaUIb.ttf", "leelauib.ttf", "tahomabd.ttf", "arialbd.ttf"),
+            "bold": ("LeelaUIb.ttf", "leelauib.ttf", "tahomabd.ttf", "arialbd.ttf"),
+        }[weight]
+    else:
+        names = {
+            "regular": ("segoeui.ttf", "tahoma.ttf", "arial.ttf"),
+            "semibold": ("seguisb.ttf", "segoeuib.ttf", "tahomabd.ttf", "arialbd.ttf"),
+            "bold": ("segoeuib.ttf", "tahomabd.ttf", "arialbd.ttf"),
+        }[weight]
     for n in names:
         try:
             return ImageFont.truetype(n, px)
@@ -154,7 +161,7 @@ def render(status: Status, cfg: dict, selected_key: str | None) -> tuple[Image.I
 
     # ----- header -----
     _text_center(d, W * S / 2, 28 * S, "Claude Usage", _font(19 * S, "bold"), TXT)
-    ws = "โควต้าคงเหลือ"
+    ws = t("dash.subtitle")
     wf = _font(11 * S)
     wbb = d.textbbox((0, 0), ws, font=wf)
     wtot = (wbb[2] - wbb[0]) + 14 * S
@@ -221,16 +228,15 @@ def render(status: Status, cfg: dict, selected_key: str | None) -> tuple[Image.I
     nx = cx * S - (bb[2] - bb[0]) / 2 - bb[0]
     d.text((nx, (cy - 52) * S), num, font=nf, fill=TXT)
     d.text((nx + (bb[2] - bb[0]) + 4 * S, (cy - 44) * S), "%", font=_font(20 * S, "regular"), fill=color)
-    _text_center(d, cx * S, (cy + 20) * S, "Token เหลือ", _font(12 * S), SUB)
+    _text_center(d, cx * S, (cy + 20) * S, t("dash.tokens_left"), _font(12 * S), SUB)
     if sel:
-        _text_center(d, cx * S, (cy + 38) * S, f"รีเซ็ต {humanize_reset(sel.resets_at)}",
+        _text_center(d, cx * S, (cy + 38) * S, t("common.resets", reset=humanize_reset(sel.resets_at)),
                      _font(10 * S), SUB)
 
     # ----- โหมด/สถานะ -----
-    words = {GREEN: "HEALTHY", ORANGE: "LOW", RED: "CRITICAL"}
     st = _classify(sel.remaining_pct, cfg) if sel else GREEN
-    _text_center(d, W * S / 2, 388 * S, "สถานะ", _font(10 * S), SUB)
-    _text_center(d, W * S / 2, 404 * S, words[st], _font(20 * S, "bold"), COLORS[st])
+    _text_center(d, W * S / 2, 388 * S, t("dash.status"), _font(10 * S), SUB)
+    _text_center(d, W * S / 2, 404 * S, t(f"state.{st}"), _font(20 * S, "bold"), COLORS[st])
 
     # ----- การ์ด quota (เลือกได้) -----
     show = quotas[:3]
@@ -260,7 +266,8 @@ def render(status: Status, cfg: dict, selected_key: str | None) -> tuple[Image.I
             ex = (x0 + cw / 2)
             d.ellipse([(ex - 9) * S, (cyc + 16) * S, (ex + 9) * S, (cyc + 34) * S],
                       fill=(qcolor if not is_sel else CARD_SEL_TXT) + (255,))
-            _text_center(d, ex * S, (cyc + 44) * S, TAGS.get(q.key, q.label), _font(11 * S, "semibold"), tcol)
+            tag = TAGS.get(q.key) or t(f"tag.{q.key}", default=q.label)
+            _text_center(d, ex * S, (cyc + 44) * S, tag, _font(11 * S, "semibold"), tcol)
             _text_center(d, ex * S, (cyc + 62) * S, f"{q.remaining_pct:.0f}%", _font(15 * S, "bold"), tcol)
             regions["cards"].append((q.key, (x0, cyc, x0 + cw, cyc + ch)))
 

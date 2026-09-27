@@ -27,6 +27,8 @@ if os.path.exists(ICON):
 FONTS = os.path.join(HERE, "assets", "fonts")
 if os.path.isdir(FONTS):
     ARGS += ["--add-data", f"{FONTS}{os.pathsep}assets/fonts"]  # bundle ฟอนต์ widget
+LOCALES = os.path.join(HERE, "claude_usage_tray", "locales")
+ARGS += ["--add-data", f"{LOCALES}{os.pathsep}claude_usage_tray/locales"]  # UI translations
 ARGS.append(os.path.join(HERE, "app.py"))
 
 if __name__ == "__main__":

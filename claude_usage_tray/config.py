@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from . import i18n
+
 CONFIG_PATH = Path.home() / ".claude-usage-tray.json"
 
 # ค่าเริ่มต้น — ทุกค่าปรับได้ในไฟล์ config
@@ -36,6 +38,8 @@ DEFAULTS: dict[str, Any] = {
     # widget ลอยหน้าจอ (ธีมสว่าง)
     "widget_opacity": 0.94,     # ความโปร่งใส 0.5–1.0
     "widget_on_start": False,   # เปิด widget อัตโนมัติเมื่อเริ่มโปรแกรม
+    # UI language: en / uk / ru / th (also switchable from the tray menu)
+    "language": i18n.DEFAULT,
 }
 
 

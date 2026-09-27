@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from .i18n import t
+
 # ระดับสถานะ เรียงจากดี -> แย่
 GREEN = "green"
 ORANGE = "orange"
@@ -19,13 +21,10 @@ COLORS = {
     UNKNOWN: (148, 163, 184),  # เทา #94A3B8
 }
 
-# ป้ายภาษาไทยของแต่ละ quota
-LABELS = {
-    "five_hour": "5 ชั่วโมง",
-    "seven_day": "รายสัปดาห์",
-    "seven_day_opus": "Opus (สัปดาห์)",
-    "seven_day_sonnet": "Sonnet (สัปดาห์)",
-}
+
+def quota_label(key: str) -> str:
+    """Localized quota name (locales: quota.<key>); unknown quotas show their key."""
+    return t(f"quota.{key}", default=key)
 
 
 @dataclass
@@ -57,7 +56,8 @@ def _classify(remaining: float, cfg: dict[str, Any]) -> str:
 def evaluate(usage: dict[str, Any], cfg: dict[str, Any]) -> Status:
     """คำนวณสถานะจาก response ของ fetch_usage()."""
     if usage.get("error"):
-        return Status(UNKNOWN, None, None, [], error=usage.get("message") or usage["error"])
+        code = usage["error"]
+        return Status(UNKNOWN, None, None, [], error=t(f"error.{code}", default=usage.get("message") or code))
 
     quotas: list[Quota] = []
     for key, val in usage.items():
@@ -70,7 +70,7 @@ def evaluate(usage: dict[str, Any], cfg: dict[str, Any]) -> Status:
         quotas.append(
             Quota(
                 key=key,
-                label=LABELS.get(key, key),
+                label=quota_label(key),
                 used_pct=used,
                 remaining_pct=max(0.0, 100.0 - used),
                 resets_at=val.get("resets_at"),
@@ -78,7 +78,7 @@ def evaluate(usage: dict[str, Any], cfg: dict[str, Any]) -> Status:
         )
 
     if not quotas:
-        return Status(UNKNOWN, None, None, [], error="ไม่มีข้อมูล quota")
+        return Status(UNKNOWN, None, None, [], error=t("error.no_quota"))
 
     # เลือกสีจาก quota ที่ผู้ใช้สั่งให้เฝ้า (watch) และเหลือน้อยที่สุด = แย่สุด
     watched = [q for q in quotas if q.key in cfg["watch"]] or quotas
@@ -100,12 +100,12 @@ def humanize_reset(resets_at: str | None) -> str:
     delta = dt - datetime.now(timezone.utc)
     secs = int(delta.total_seconds())
     if secs <= 0:
-        return "เร็ว ๆ นี้"
+        return t("reset.soon")
     h, rem = divmod(secs, 3600)
     m = rem // 60
     if h >= 24:
         d, hh = divmod(h, 24)
-        return f"อีก {d}วัน {hh}ชม"
+        return t("reset.days", d=d, h=hh)
     if h:
-        return f"อีก {h}ชม {m}น"
-    return f"อีก {m}น"
+        return t("reset.hours", h=h, m=m)
+    return t("reset.minutes", m=m)

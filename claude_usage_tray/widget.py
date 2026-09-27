@@ -13,6 +13,7 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from . import icon as icon_mod
+from .i18n import get_language, t
 from .status import COLORS, GREEN, ORANGE, RED, Status, humanize_reset
 
 W, H = 320, 224
@@ -31,13 +32,6 @@ BTN_BG = (240, 242, 246)
 # Material icon codepoints
 MI = {"refresh": 0xE5D5, "close": 0xE5CD, "pin": 0xF10D, "monitor": 0xEF5B,
       "dot": 0xE061, "schedule": 0xE8B5}
-
-LABELS = {
-    "five_hour": "เซสชันปัจจุบัน",
-    "seven_day": "สัปดาห์นี้ (ทุกโมเดล)",
-    "seven_day_opus": "Opus (สัปดาห์)",
-    "seven_day_sonnet": "Sonnet (สัปดาห์)",
-}
 
 _cache: dict[str, Any] = {}
 
@@ -75,6 +69,11 @@ def _inter(px, weight="Regular"):
         except OSError:
             _cache[key] = _sarabun(px, "SemiBold" if "Bold" in weight else "Regular")
     return _cache[key]
+
+
+def _text(px, weight="Regular"):
+    """Font for translated text: Sarabun has no Cyrillic, so non-Thai languages use Inter."""
+    return _sarabun(px, weight) if get_language() == "th" else _inter(px, weight)
 
 
 def _mi(px):
@@ -146,17 +145,17 @@ def render(status: Status, cfg: dict, plan: str | None, updated: str) -> tuple[I
     y = 58
     for q in quotas:
         col = COLORS[_classify(q.remaining_pct, cfg)]
-        label = LABELS.get(q.key, q.label)
-        _rt(d, pad * S, y * S, label, _sarabun(13.5 * S, "SemiBold"), TXT)
-        _rt(d, (W - pad) * S, y * S, f"{q.used_pct:.0f}% ใช้ไป",
-            _sarabun(12 * S, "Medium"), SUB, anchor="ra")
+        label = t(f"widget.{q.key}", default=q.label)
+        _rt(d, pad * S, y * S, label, _text(13.5 * S, "SemiBold"), TXT)
+        _rt(d, (W - pad) * S, y * S, t("widget.used", pct=f"{q.used_pct:.0f}"),
+            _text(12 * S, "Medium"), SUB, anchor="ra")
         # แถบ
         by = y + 22
         _pill(d, [pad * S, by * S, (W - pad) * S, (by + 8) * S], 4 * S, TRACK + (255,))
         fw = max(8, (W - pad * 2) * min(1.0, q.used_pct / 100.0))
         _pill(d, [pad * S, by * S, (pad + fw) * S, (by + 8) * S], 4 * S, col + (255,))
-        _rt(d, pad * S, (by + 12) * S, f"รีเซ็ต {humanize_reset(q.resets_at)}",
-            _sarabun(11 * S, "Regular"), SUB)
+        _rt(d, pad * S, (by + 12) * S, t("common.resets", reset=humanize_reset(q.resets_at)),
+            _text(11 * S, "Regular"), SUB)
         y += 56
 
     # ----- footer -----
@@ -164,8 +163,8 @@ def render(status: Status, cfg: dict, plan: str | None, updated: str) -> tuple[I
     d.rounded_rectangle([pad * S, (fy - 8) * S, (W - pad) * S, (fy - 8) * S], 0,
                         outline=BORDER + (120,), width=int(1 * S))
     _rt(d, pad * S, fy * S, chr(MI["dot"]), _mi(11 * S), COLORS[GREEN], anchor="lm")
-    _rt(d, (pad + 16) * S, fy * S, f"อัปเดต {updated} · ทุก {cfg['poll_seconds'] // 60} นาที",
-        _sarabun(10.5 * S, "Regular"), SUB, anchor="lm")
+    _rt(d, (pad + 16) * S, fy * S, t("widget.footer", time=updated, n=cfg["poll_seconds"] // 60),
+        _text(10.5 * S, "Regular"), SUB, anchor="lm")
 
     # ปุ่มปักหมุด + รีเฟรช (มุมขวาล่าง)
     pinned = bool(_cache.get("_pinned", True))
@@ -181,6 +180,6 @@ def render(status: Status, cfg: dict, plan: str | None, updated: str) -> tuple[I
     regions["refresh"] = (rf_x, fy - 12, rf_x + rf_w, fy + 12)
 
     if status.error:
-        _rt(d, (W / 2) * S, (H - 4) * S, status.error, _sarabun(10 * S), COLORS[ORANGE], anchor="mm")
+        _rt(d, (W / 2) * S, (H - 4) * S, status.error, _text(10 * S), COLORS[ORANGE], anchor="mm")
 
     return img.resize((W, H), Image.LANCZOS), regions
