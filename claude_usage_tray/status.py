@@ -21,6 +21,9 @@ COLORS = {
     UNKNOWN: (148, 163, 184),  # เทา #94A3B8
 }
 
+# usage keys that are real quota windows: five_hour, seven_day, seven_day_opus, ...
+QUOTA_PREFIXES = ("five_hour", "seven_day")
+
 
 def quota_label(key: str) -> str:
     """Localized quota name (locales: quota.<key>); unknown quotas show their key."""
@@ -61,7 +64,9 @@ def evaluate(usage: dict[str, Any], cfg: dict[str, Any]) -> Status:
 
     quotas: list[Quota] = []
     for key, val in usage.items():
-        if not isinstance(val, dict):
+        # only plan rate-limit windows; the endpoint also returns codename entries
+        # (e.g. "iguana_necktie" = a dollar credit budget) that are not quotas
+        if not isinstance(val, dict) or not key.startswith(QUOTA_PREFIXES):
             continue
         util = val.get("utilization")
         if util is None:
